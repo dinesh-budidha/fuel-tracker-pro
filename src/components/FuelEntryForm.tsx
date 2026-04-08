@@ -1,13 +1,18 @@
 import { useState, useMemo } from "react";
+import { format } from "date-fns";
+import { CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 import {
-  DEFAULT_SITES, FUEL_TYPES, formatDateDDMMYYYY, getYesterday,
+  DEFAULT_SITES, FUEL_TYPES, formatDateDDMMYYYY, parseDateDDMMYYYY, getYesterday,
   getStoredCustomSites, saveCustomSites, getLastBalanceForSite,
   type FuelEntry,
 } from "@/lib/fuel-types";
@@ -26,6 +31,7 @@ export default function FuelEntryForm({ onSubmit, nextSlNo, entries }: Props) {
 
   const yesterday = getYesterday();
   const [date, setDate] = useState(formatDateDDMMYYYY(yesterday));
+  const [calendarDate, setCalendarDate] = useState<Date | undefined>(yesterday);
   const [siteName, setSiteName] = useState("");
   const [otherSite, setOtherSite] = useState("");
   const [fuelType, setFuelType] = useState<"PETROL" | "DIESEL">("DIESEL");
@@ -33,17 +39,38 @@ export default function FuelEntryForm({ onSubmit, nextSlNo, entries }: Props) {
   const [indentNumber, setIndentNumber] = useState("");
   const [issuedThroughIndentLtrs, setIssuedThroughIndentLtrs] = useState("");
   const [issuedThroughBarrelLtrs, setIssuedThroughBarrelLtrs] = useState("");
+  const [openingBalanceManual, setOpeningBalanceManual] = useState<string>("");
 
   const finalSiteName = siteName === "OTHER" ? otherSite.trim().toUpperCase() : siteName;
 
-  // Auto-calculate opening balance from last entry of same site+fuelType
-  const openingBalance = useMemo(() => {
+  // Auto-calculate opening balance from last entry, but allow manual override
+  const autoOpeningBalance = useMemo(() => {
     if (!finalSiteName) return 0;
     return getLastBalanceForSite(entries, finalSiteName, fuelType);
   }, [entries, finalSiteName, fuelType]);
 
+  const openingBalance = openingBalanceManual !== "" ? Number(openingBalanceManual) : autoOpeningBalance;
+
+  // Sync manual field when auto value changes
+  useMemo(() => {
+    setOpeningBalanceManual("");
+  }, [finalSiteName, fuelType]);
+
   const computedIssued = (Number(issuedThroughIndentLtrs) || 0) + (Number(issuedThroughBarrelLtrs) || 0);
   const computedBalance = openingBalance + (Number(purchased) || 0) - computedIssued;
+
+  const handleCalendarSelect = (selected: Date | undefined) => {
+    if (selected) {
+      setCalendarDate(selected);
+      setDate(formatDateDDMMYYYY(selected));
+    }
+  };
+
+  const handleDateInputChange = (val: string) => {
+    setDate(val);
+    const parsed = parseDateDDMMYYYY(val);
+    if (parsed) setCalendarDate(parsed);
+  };
 
   const handleAddCustomSite = () => {
     const name = otherSite.trim().toUpperCase();
@@ -95,6 +122,7 @@ export default function FuelEntryForm({ onSubmit, nextSlNo, entries }: Props) {
     onSubmit(entry);
     toast({ title: "Entry saved!" });
     setPurchased("");
+    setOpeningBalanceManual("");
     setIndentNumber(""); setIssuedThroughIndentLtrs(""); setIssuedThroughBarrelLtrs("");
   };
 
@@ -105,7 +133,25 @@ export default function FuelEntryForm({ onSubmit, nextSlNo, entries }: Props) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <Label>Date (DD-MM-YYYY)</Label>
-          <Input value={date} onChange={e => setDate(e.target.value)} placeholder="DD-MM-YYYY" />
+          <div className="flex gap-2">
+            <Input value={date} onChange={e => handleDateInputChange(e.target.value)} placeholder="DD-MM-YYYY" className="flex-1" />
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button type="button" variant="outline" size="icon">
+                  <CalendarIcon className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={calendarDate}
+                  onSelect={handleCalendarSelect}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
 
         <div>
@@ -151,7 +197,12 @@ export default function FuelEntryForm({ onSubmit, nextSlNo, entries }: Props) {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
           <Label>Opening Balance (Ltrs)</Label>
-          <Input type="number" value={openingBalance} readOnly className="bg-muted" />
+          <Input
+            type="number"
+            value={openingBalanceManual !== "" ? openingBalanceManual : String(autoOpeningBalance)}
+            onChange={e => setOpeningBalanceManual(e.target.value)}
+            placeholder="Auto or enter manually"
+          />
         </div>
         <div>
           <Label>Fuel Purchased (Ltrs)</Label>
