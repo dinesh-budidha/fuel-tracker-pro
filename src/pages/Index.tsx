@@ -6,7 +6,6 @@ import FuelTable from "@/components/FuelTable";
 import SiteFilter from "@/components/SiteFilter";
 import ExportButton from "@/components/ExportButton";
 import { useGoogleSheetsSync } from "@/hooks/use-google-sheets-sync";
-import { type FuelEntry } from "@/lib/fuel-types";
 import { RefreshCw, Cloud, CloudOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -60,14 +59,14 @@ export default function Index() {
 
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-8">
         <DashboardCards entries={entries} />
-        <FuelEntryForm onSubmit={addEntry} nextSlNo={nextSlNo} />
+        <FuelEntryForm onSubmit={addEntry} nextSlNo={nextSlNo} entries={entries} />
 
         <div className="flex items-center justify-between flex-wrap gap-3">
           <SiteFilter value={siteFilter} onChange={setSiteFilter} usedSites={usedSites} />
           <ExportButton entries={filtered} />
         </div>
 
-        <FuelTable entries={filtered} onEdit={editEntry} />
+        <FuelTable entries={filtered} onEdit={editEntry} onDelete={deleteEntry} />
       </main>
     </div>
   );

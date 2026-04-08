@@ -14,6 +14,7 @@ export default function ExportButton({ entries }: Props) {
       "DATE": e.date,
       "SITE NAME": e.siteName,
       "FUEL TYPE": e.fuelType,
+      "OPENING BALANCE (LTRS)": e.openingBalance ?? 0,
       "FUEL PURCHASED (LTRS)": e.purchased,
       "INDENT NO.": e.indentNumber || "",
       "FUEL ISSUED THROUGH INDENT (LTRS)": e.issuedThroughIndentLtrs,
