@@ -13,8 +13,16 @@ export function useGoogleSheetsSync() {
   const { toast } = useToast();
   const writeQueue = useRef<FuelEntry[] | null>(null);
   const isWriting = useRef(false);
-  const entriesRef = useRef(entries);
-  entriesRef.current = entries;
+  const pendingWrite = useRef<FuelEntry[] | null>(null);
+
+  // Process pending writes outside of setState
+  useEffect(() => {
+    if (pendingWrite.current) {
+      const toWrite = pendingWrite.current;
+      pendingWrite.current = null;
+      writeToSheets(toWrite);
+    }
+  });
 
   const fetchFromSheets = useCallback(async () => {
     try {
@@ -77,51 +85,41 @@ export function useGoogleSheetsSync() {
     }
   }, [toast]);
 
-  const updateEntries = useCallback((newEntries: FuelEntry[]) => {
-    setEntries(newEntries);
-    saveEntries(newEntries);
-    writeToSheets(newEntries);
-  }, [writeToSheets]);
-
-  // Use functional update to avoid stale closure for addEntry
   const addEntry = useCallback((entry: FuelEntry) => {
     setEntries(prev => {
-      // Check for duplicate slNo
       if (prev.some(e => e.slNo === entry.slNo)) {
         const maxSlNo = Math.max(...prev.map(e => e.slNo), 0);
         entry = { ...entry, slNo: maxSlNo + 1 };
       }
       const updated = [...prev, entry];
       saveEntries(updated);
-      writeToSheets(updated);
+      pendingWrite.current = updated;
       return updated;
     });
-  }, [writeToSheets]);
+  }, []);
 
   const editEntry = useCallback((updated: FuelEntry) => {
     setEntries(prev => {
       const newEntries = prev.map(e => e.slNo === updated.slNo ? updated : e);
       saveEntries(newEntries);
-      writeToSheets(newEntries);
+      pendingWrite.current = newEntries;
       return newEntries;
     });
-  }, [writeToSheets]);
+  }, []);
 
   const deleteEntry = useCallback((slNo: number) => {
     setEntries(prev => {
       const newEntries = prev.filter(e => e.slNo !== slNo);
       saveEntries(newEntries);
-      writeToSheets(newEntries);
+      pendingWrite.current = newEntries;
       return newEntries;
     });
-  }, [writeToSheets]);
+  }, []);
 
-  // Initial fetch
   useEffect(() => {
     fetchFromSheets();
   }, [fetchFromSheets]);
 
-  // Poll every 30 seconds
   useEffect(() => {
     const interval = setInterval(fetchFromSheets, POLL_INTERVAL);
     return () => clearInterval(interval);
