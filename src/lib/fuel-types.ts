@@ -3,6 +3,7 @@ export interface FuelEntry {
   date: string;
   siteName: string;
   fuelType: "PETROL" | "DIESEL";
+  openingBalance: number;
   purchased: number;
   indentNumber: string;
   issuedThroughIndentLtrs: number;
@@ -58,6 +59,7 @@ export function getStoredEntries(): FuelEntry[] {
     const raw = JSON.parse(localStorage.getItem("fuelEntries") || "[]");
     return raw.map((e: any) => ({
       ...e,
+      openingBalance: e.openingBalance ?? 0,
       indentNumber: e.indentNumber || "",
       issuedThroughIndentLtrs: e.issuedThroughIndentLtrs ?? 0,
       issuedThroughBarrelLtrs: e.issuedThroughBarrelLtrs ?? 0,
@@ -67,4 +69,22 @@ export function getStoredEntries(): FuelEntry[] {
 
 export function saveEntries(entries: FuelEntry[]) {
   localStorage.setItem("fuelEntries", JSON.stringify(entries));
+}
+
+/**
+ * Get the last balance for a given site + fuel type from existing entries.
+ * Returns 0 if no previous entry exists.
+ */
+export function getLastBalanceForSite(
+  entries: FuelEntry[],
+  siteName: string,
+  fuelType: "PETROL" | "DIESEL"
+): number {
+  const siteEntries = entries.filter(
+    e => e.siteName === siteName && e.fuelType === fuelType
+  );
+  if (siteEntries.length === 0) return 0;
+  // Use the last entry's balance (entries are ordered by slNo)
+  const last = siteEntries[siteEntries.length - 1];
+  return last.balance;
 }
