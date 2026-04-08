@@ -36,15 +36,8 @@ export default function DashboardCards({ entries }: Props) {
     return result;
   }, [entries, selectedDate, dashboardSite]);
 
-  const petrol = filtered.filter(e => e.fuelType === "PETROL");
   const diesel = filtered.filter(e => e.fuelType === "DIESEL");
-
-  const petrolCards = [
-    { label: "PETROL PURCHASED", value: petrol.reduce((s, e) => s + e.purchased, 0), icon: Fuel, unit: "Ltrs" },
-    { label: "PETROL ISSUED", value: petrol.reduce((s, e) => s + e.issued, 0), icon: Fuel, unit: "Ltrs" },
-    { label: "PETROL BALANCE", value: petrol.reduce((s, e) => s + e.balance, 0), icon: Scale, unit: "Ltrs" },
-    { label: "PETROL THROUGH INDENT", value: petrol.reduce((s, e) => s + e.issuedThroughIndentLtrs, 0), icon: BookOpen, unit: "Ltrs" },
-  ];
+  const petrol = filtered.filter(e => e.fuelType === "PETROL");
 
   const dieselCards = [
     { label: "DIESEL PURCHASED", value: diesel.reduce((s, e) => s + e.purchased, 0), icon: Droplets, unit: "Ltrs" },
@@ -52,6 +45,13 @@ export default function DashboardCards({ entries }: Props) {
     { label: "DIESEL BALANCE", value: diesel.reduce((s, e) => s + e.balance, 0), icon: Scale, unit: "Ltrs" },
     { label: "DIESEL THROUGH INDENT", value: diesel.reduce((s, e) => s + e.issuedThroughIndentLtrs, 0), icon: BookOpen, unit: "Ltrs" },
     { label: "DIESEL THROUGH BARREL", value: diesel.reduce((s, e) => s + e.issuedThroughBarrelLtrs, 0), icon: Package, unit: "Ltrs" },
+  ];
+
+  const petrolCards = [
+    { label: "PETROL PURCHASED", value: petrol.reduce((s, e) => s + e.purchased, 0), icon: Fuel, unit: "Ltrs" },
+    { label: "PETROL ISSUED", value: petrol.reduce((s, e) => s + e.issued, 0), icon: Fuel, unit: "Ltrs" },
+    { label: "PETROL BALANCE", value: petrol.reduce((s, e) => s + e.balance, 0), icon: Scale, unit: "Ltrs" },
+    { label: "PETROL THROUGH INDENT", value: petrol.reduce((s, e) => s + e.issuedThroughIndentLtrs, 0), icon: BookOpen, unit: "Ltrs" },
   ];
 
   return (
@@ -84,12 +84,12 @@ export default function DashboardCards({ entries }: Props) {
         </Select>
       </div>
 
-      {/* Petrol Section */}
-      <h3 className="text-lg font-bold mb-3" style={{ color: "hsl(var(--fuel-green))" }}>PETROL</h3>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        {petrolCards.map((card, i) => (
+      {/* Diesel Section - FIRST */}
+      <h3 className="text-lg font-bold mb-3" style={{ color: "hsl(var(--fuel-blue))" }}>DIESEL</h3>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        {dieselCards.map((card, i) => (
           <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-            className="rounded-xl p-4 text-primary-foreground" style={{ backgroundColor: "hsl(var(--fuel-green))" }}>
+            className="rounded-xl p-4 text-primary-foreground" style={{ backgroundColor: "hsl(var(--fuel-blue))" }}>
             <card.icon className="h-5 w-5 mb-2 opacity-80" />
             <div className="text-2xl font-bold">{card.value.toLocaleString("en-IN")} <span className="text-sm font-normal">{card.unit}</span></div>
             <div className="text-xs opacity-80 mt-1">{card.label}</div>
@@ -97,12 +97,12 @@ export default function DashboardCards({ entries }: Props) {
         ))}
       </div>
 
-      {/* Diesel Section */}
-      <h3 className="text-lg font-bold mb-3" style={{ color: "hsl(var(--fuel-blue))" }}>DIESEL</h3>
+      {/* Petrol Section - SECOND */}
+      <h3 className="text-lg font-bold mb-3" style={{ color: "hsl(var(--fuel-green))" }}>PETROL</h3>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        {dieselCards.map((card, i) => (
+        {petrolCards.map((card, i) => (
           <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-            className="rounded-xl p-4 text-primary-foreground" style={{ backgroundColor: "hsl(var(--fuel-blue))" }}>
+            className="rounded-xl p-4 text-primary-foreground" style={{ backgroundColor: "hsl(var(--fuel-green))" }}>
             <card.icon className="h-5 w-5 mb-2 opacity-80" />
             <div className="text-2xl font-bold">{card.value.toLocaleString("en-IN")} <span className="text-sm font-normal">{card.unit}</span></div>
             <div className="text-xs opacity-80 mt-1">{card.label}</div>

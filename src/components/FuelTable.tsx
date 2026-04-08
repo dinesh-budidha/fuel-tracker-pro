@@ -5,15 +5,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Pencil, Check, X } from "lucide-react";
+import { Pencil, Check, X, Trash2 } from "lucide-react";
 import { type FuelEntry } from "@/lib/fuel-types";
 
 interface Props {
   entries: FuelEntry[];
   onEdit: (updated: FuelEntry) => void;
+  onDelete: (slNo: number) => void;
 }
 
-export default function FuelTable({ entries, onEdit }: Props) {
+export default function FuelTable({ entries, onEdit, onDelete }: Props) {
   const { toast } = useToast();
   const [editingSlNo, setEditingSlNo] = useState<number | null>(null);
   const [editData, setEditData] = useState<Partial<FuelEntry>>({});
@@ -31,11 +32,16 @@ export default function FuelTable({ entries, onEdit }: Props) {
   const saveEdit = () => {
     const updated = { ...editData } as FuelEntry;
     updated.issued = (updated.issuedThroughIndentLtrs || 0) + (updated.issuedThroughBarrelLtrs || 0);
-    updated.balance = updated.purchased - updated.issued;
+    updated.balance = (updated.openingBalance || 0) + updated.purchased - updated.issued;
     onEdit(updated);
     toast({ title: "Entry updated!" });
     setEditingSlNo(null);
     setEditData({});
+  };
+
+  const handleDelete = (slNo: number) => {
+    onDelete(slNo);
+    toast({ title: "Entry deleted!" });
   };
 
   const setField = (key: keyof FuelEntry, val: any) => {
@@ -51,6 +57,7 @@ export default function FuelTable({ entries, onEdit }: Props) {
             <TableHead>DATE</TableHead>
             <TableHead>SITE NAME</TableHead>
             <TableHead>FUEL TYPE</TableHead>
+            <TableHead>OPENING BALANCE (LTRS)</TableHead>
             <TableHead>FUEL PURCHASED (LTRS)</TableHead>
             <TableHead>INDENT NO.</TableHead>
             <TableHead>FUEL ISSUED THROUGH INDENT (LTRS)</TableHead>
@@ -63,7 +70,7 @@ export default function FuelTable({ entries, onEdit }: Props) {
         <TableBody>
           {entries.length === 0 && (
             <TableRow>
-              <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
+              <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
                 No entries yet. Add your first fuel entry above.
               </TableCell>
             </TableRow>
@@ -71,6 +78,12 @@ export default function FuelTable({ entries, onEdit }: Props) {
           {entries.map((entry) => {
             const isEditing = editingSlNo === entry.slNo;
             const d = isEditing ? editData : entry;
+            const editOB = Number(d.openingBalance) || 0;
+            const editPurchased = Number(d.purchased) || 0;
+            const editIndent = Number(d.issuedThroughIndentLtrs) || 0;
+            const editBarrel = Number(d.issuedThroughBarrelLtrs) || 0;
+            const editIssued = editIndent + editBarrel;
+            const editBalance = editOB + editPurchased - editIssued;
 
             return (
               <TableRow key={entry.slNo}>
@@ -78,6 +91,11 @@ export default function FuelTable({ entries, onEdit }: Props) {
                 <TableCell>{entry.date}</TableCell>
                 <TableCell>{entry.siteName}</TableCell>
                 <TableCell>{entry.fuelType}</TableCell>
+                <TableCell>
+                  {isEditing ? (
+                    <Input type="number" className="w-24" value={d.openingBalance} onChange={e => setField("openingBalance", Number(e.target.value))} />
+                  ) : (entry.openingBalance ?? 0).toLocaleString("en-IN")}
+                </TableCell>
                 <TableCell>
                   {isEditing ? (
                     <Input type="number" className="w-24" value={d.purchased} onChange={e => setField("purchased", Number(e.target.value))} />
@@ -99,14 +117,10 @@ export default function FuelTable({ entries, onEdit }: Props) {
                   ) : (entry.issuedThroughBarrelLtrs ?? 0).toLocaleString("en-IN")}
                 </TableCell>
                 <TableCell>
-                  {isEditing
-                    ? ((Number(d.issuedThroughIndentLtrs) || 0) + (Number(d.issuedThroughBarrelLtrs) || 0)).toLocaleString("en-IN")
-                    : entry.issued.toLocaleString("en-IN")}
+                  {isEditing ? editIssued.toLocaleString("en-IN") : entry.issued.toLocaleString("en-IN")}
                 </TableCell>
                 <TableCell>
-                  {isEditing
-                    ? (Number(d.purchased) - ((Number(d.issuedThroughIndentLtrs) || 0) + (Number(d.issuedThroughBarrelLtrs) || 0))).toLocaleString("en-IN")
-                    : entry.balance.toLocaleString("en-IN")}
+                  {isEditing ? editBalance.toLocaleString("en-IN") : entry.balance.toLocaleString("en-IN")}
                 </TableCell>
                 <TableCell>
                   {isEditing ? (
@@ -115,9 +129,14 @@ export default function FuelTable({ entries, onEdit }: Props) {
                       <Button size="icon" variant="ghost" onClick={cancelEdit}><X className="h-4 w-4" /></Button>
                     </div>
                   ) : (
-                    <Button size="icon" variant="ghost" onClick={() => startEdit(entry)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button size="icon" variant="ghost" onClick={() => startEdit(entry)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" onClick={() => handleDelete(entry.slNo)} className="text-destructive">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   )}
                 </TableCell>
               </TableRow>

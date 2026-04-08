@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { type FuelEntry, getStoredEntries, saveEntries } from "@/lib/fuel-types";
 import { useToast } from "@/hooks/use-toast";
 
-const POLL_INTERVAL = 30_000; // 30 seconds
+const POLL_INTERVAL = 30_000;
 
 export function useGoogleSheetsSync() {
   const [entries, setEntries] = useState<FuelEntry[]>(getStoredEntries());
@@ -13,6 +13,8 @@ export function useGoogleSheetsSync() {
   const { toast } = useToast();
   const writeQueue = useRef<FuelEntry[] | null>(null);
   const isWriting = useRef(false);
+  const entriesRef = useRef(entries);
+  entriesRef.current = entries;
 
   const fetchFromSheets = useCallback(async () => {
     try {
@@ -25,7 +27,13 @@ export function useGoogleSheetsSync() {
       if (fnError) throw new Error(fnError.message);
       if (data?.error) throw new Error(data.error);
 
-      const sheetEntries: FuelEntry[] = data.entries || [];
+      const sheetEntries: FuelEntry[] = (data.entries || []).map((e: any) => ({
+        ...e,
+        openingBalance: e.openingBalance ?? 0,
+        indentNumber: e.indentNumber || "",
+        issuedThroughIndentLtrs: e.issuedThroughIndentLtrs ?? 0,
+        issuedThroughBarrelLtrs: e.issuedThroughBarrelLtrs ?? 0,
+      }));
       setEntries(sheetEntries);
       saveEntries(sheetEntries);
       setLastSynced(new Date());
@@ -75,23 +83,38 @@ export function useGoogleSheetsSync() {
     writeToSheets(newEntries);
   }, [writeToSheets]);
 
+  // Use functional update to avoid stale closure for addEntry
   const addEntry = useCallback((entry: FuelEntry) => {
-    const updated = [...entries, entry];
-    updateEntries(updated);
-    return updated;
-  }, [entries, updateEntries]);
+    setEntries(prev => {
+      // Check for duplicate slNo
+      if (prev.some(e => e.slNo === entry.slNo)) {
+        const maxSlNo = Math.max(...prev.map(e => e.slNo), 0);
+        entry = { ...entry, slNo: maxSlNo + 1 };
+      }
+      const updated = [...prev, entry];
+      saveEntries(updated);
+      writeToSheets(updated);
+      return updated;
+    });
+  }, [writeToSheets]);
 
   const editEntry = useCallback((updated: FuelEntry) => {
-    const newEntries = entries.map(e => e.slNo === updated.slNo ? updated : e);
-    updateEntries(newEntries);
-    return newEntries;
-  }, [entries, updateEntries]);
+    setEntries(prev => {
+      const newEntries = prev.map(e => e.slNo === updated.slNo ? updated : e);
+      saveEntries(newEntries);
+      writeToSheets(newEntries);
+      return newEntries;
+    });
+  }, [writeToSheets]);
 
   const deleteEntry = useCallback((slNo: number) => {
-    const newEntries = entries.filter(e => e.slNo !== slNo);
-    updateEntries(newEntries);
-    return newEntries;
-  }, [entries, updateEntries]);
+    setEntries(prev => {
+      const newEntries = prev.filter(e => e.slNo !== slNo);
+      saveEntries(newEntries);
+      writeToSheets(newEntries);
+      return newEntries;
+    });
+  }, [writeToSheets]);
 
   // Initial fetch
   useEffect(() => {

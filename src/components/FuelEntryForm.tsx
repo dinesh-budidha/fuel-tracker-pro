@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,16 +8,18 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import {
   DEFAULT_SITES, FUEL_TYPES, formatDateDDMMYYYY, getYesterday,
-  getStoredCustomSites, saveCustomSites, type FuelEntry,
+  getStoredCustomSites, saveCustomSites, getLastBalanceForSite,
+  type FuelEntry,
 } from "@/lib/fuel-types";
 import { Plus, Trash2 } from "lucide-react";
 
 interface Props {
   onSubmit: (entry: FuelEntry) => void;
   nextSlNo: number;
+  entries: FuelEntry[];
 }
 
-export default function FuelEntryForm({ onSubmit, nextSlNo }: Props) {
+export default function FuelEntryForm({ onSubmit, nextSlNo, entries }: Props) {
   const { toast } = useToast();
   const [customSites, setCustomSites] = useState(getStoredCustomSites());
   const allSites = [...DEFAULT_SITES, ...customSites, "OTHER"];
@@ -31,9 +33,17 @@ export default function FuelEntryForm({ onSubmit, nextSlNo }: Props) {
   const [indentNumber, setIndentNumber] = useState("");
   const [issuedThroughIndentLtrs, setIssuedThroughIndentLtrs] = useState("");
   const [issuedThroughBarrelLtrs, setIssuedThroughBarrelLtrs] = useState("");
-  const [balance, setBalance] = useState("");
+
+  const finalSiteName = siteName === "OTHER" ? otherSite.trim().toUpperCase() : siteName;
+
+  // Auto-calculate opening balance from last entry of same site+fuelType
+  const openingBalance = useMemo(() => {
+    if (!finalSiteName) return 0;
+    return getLastBalanceForSite(entries, finalSiteName, fuelType);
+  }, [entries, finalSiteName, fuelType]);
 
   const computedIssued = (Number(issuedThroughIndentLtrs) || 0) + (Number(issuedThroughBarrelLtrs) || 0);
+  const computedBalance = openingBalance + (Number(purchased) || 0) - computedIssued;
 
   const handleAddCustomSite = () => {
     const name = otherSite.trim().toUpperCase();
@@ -60,49 +70,32 @@ export default function FuelEntryForm({ onSubmit, nextSlNo }: Props) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const finalSite = siteName === "OTHER" ? otherSite.trim().toUpperCase() : siteName;
-    if (!finalSite || !date || !purchased || !balance) {
-      toast({ title: "All fields are required", variant: "destructive" });
+    if (!finalSiteName || !date || !purchased) {
+      toast({ title: "Date, Site, and Purchased are required", variant: "destructive" });
       return;
     }
 
     const totalIssued = (Number(issuedThroughIndentLtrs) || 0) + (Number(issuedThroughBarrelLtrs) || 0);
+    const balance = openingBalance + Number(purchased) - totalIssued;
 
     const entry: FuelEntry = {
       slNo: nextSlNo,
       date: date.toUpperCase(),
-      siteName: finalSite.toUpperCase(),
+      siteName: finalSiteName.toUpperCase(),
       fuelType,
+      openingBalance,
       purchased: Number(purchased),
       indentNumber: indentNumber.trim().toUpperCase(),
       issuedThroughIndentLtrs: Number(issuedThroughIndentLtrs) || 0,
       issuedThroughBarrelLtrs: Number(issuedThroughBarrelLtrs) || 0,
       issued: totalIssued,
-      balance: Number(balance),
+      balance,
     };
 
     onSubmit(entry);
     toast({ title: "Entry saved!" });
-    setPurchased(""); setBalance("");
+    setPurchased("");
     setIndentNumber(""); setIssuedThroughIndentLtrs(""); setIssuedThroughBarrelLtrs("");
-  };
-
-  const handlePurchasedChange = (val: string) => {
-    setPurchased(val);
-    const totalIssued = (Number(issuedThroughIndentLtrs) || 0) + (Number(issuedThroughBarrelLtrs) || 0);
-    if (val) setBalance(String(Number(val) - totalIssued));
-  };
-
-  const handleIndentLtrsChange = (val: string) => {
-    setIssuedThroughIndentLtrs(val);
-    const totalIssued = (Number(val) || 0) + (Number(issuedThroughBarrelLtrs) || 0);
-    if (purchased) setBalance(String(Number(purchased) - totalIssued));
-  };
-
-  const handleBarrelLtrsChange = (val: string) => {
-    setIssuedThroughBarrelLtrs(val);
-    const totalIssued = (Number(issuedThroughIndentLtrs) || 0) + (Number(val) || 0);
-    if (purchased) setBalance(String(Number(purchased) - totalIssued));
   };
 
   return (
@@ -155,10 +148,14 @@ export default function FuelEntryForm({ onSubmit, nextSlNo }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div>
+          <Label>Opening Balance (Ltrs)</Label>
+          <Input type="number" value={openingBalance} readOnly className="bg-muted" />
+        </div>
         <div>
           <Label>Fuel Purchased (Ltrs)</Label>
-          <Input type="number" value={purchased} onChange={e => handlePurchasedChange(e.target.value)} />
+          <Input type="number" value={purchased} onChange={e => setPurchased(e.target.value)} />
         </div>
         <div>
           <Label>Indent Number</Label>
@@ -166,22 +163,22 @@ export default function FuelEntryForm({ onSubmit, nextSlNo }: Props) {
         </div>
         <div>
           <Label>Fuel Issued Through Indent (Ltrs)</Label>
-          <Input type="number" value={issuedThroughIndentLtrs} onChange={e => handleIndentLtrsChange(e.target.value)} />
+          <Input type="number" value={issuedThroughIndentLtrs} onChange={e => setIssuedThroughIndentLtrs(e.target.value)} />
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <Label>Fuel Issued Through Barrel (Ltrs)</Label>
-          <Input type="number" value={issuedThroughBarrelLtrs} onChange={e => handleBarrelLtrsChange(e.target.value)} />
+          <Input type="number" value={issuedThroughBarrelLtrs} onChange={e => setIssuedThroughBarrelLtrs(e.target.value)} />
         </div>
         <div>
           <Label>Total Fuel Issued (Ltrs)</Label>
-          <Input type="number" value={computedIssued} readOnly />
+          <Input type="number" value={computedIssued} readOnly className="bg-muted" />
         </div>
         <div>
           <Label>Balance Fuel (Ltrs)</Label>
-          <Input type="number" value={balance} onChange={e => setBalance(e.target.value)} />
+          <Input type="number" value={computedBalance} readOnly className="bg-muted" />
         </div>
       </div>
 
